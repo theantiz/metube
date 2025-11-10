@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # MeTube – Full Stack YouTube Video Downloader  
 
 A full-stack application built with **React + Tailwind CSS** and **Spring Boot** that allows users to **download and stream YouTube videos** in the highest available quality.  
@@ -45,14 +45,13 @@ When a user pastes a YouTube link and clicks **Download**:
 ---
 
 ## Request Flow
+User interacts with the React + Tailwind interface.
 
-[ User Interface (React + Tailwind) ]
-           ↓
-[ Spring Boot Backend ]
-           ↓
-[ yt-dlp + ffmpeg ]
-           ↓
-[ Streams .mp4 back to user ]
+The request is sent to the Spring Boot backend.
+
+The backend uses yt-dlp and ffmpeg to process the video.
+
+The processed .mp4 file is streamed back to the user.
 
 ---
 
@@ -68,6 +67,7 @@ Instant streaming → Video sent directly to browser
 
 Temporary cleanup → No leftover files
 
+
 --- 
 
 
@@ -75,17 +75,19 @@ Temporary cleanup → No leftover files
 
 🚧 Planned improvements to make MeTube even better:  
 
-- 🎵 **Audio-only downloads (MP3 format)**  
-- 📺 **Support for entire playlist downloads**  
-- ⚙️ **User-selectable video resolutions (480p, 720p, 1080p)**  
-- 📱 **Progress bar and download status indicator in UI**  
-- 💾 **Download history and caching for faster repeat downloads**  
-- 🌐 **Deployable cloud version**  
+- 🎵 **Audio-only downloads (MP3 format)**
+  
+- 📺 **Support for entire playlist downloads**
+  
+- ⚙️ **User-selectable video resolutions (480p, 720p, 1080p)**
+  
+- 📱 **Progress bar and download status indicator in UI**
+  
+- 💾 **Download history and caching for faster repeat downloads**
+  
+- 🌐 **Deployable cloud version**
+  
 
 ---
 ## Author
-
 Jay Chothiyawala 
-=======
-# metube
->>>>>>> 976cd966ab3a9b891afb69890af79d529b643b59
