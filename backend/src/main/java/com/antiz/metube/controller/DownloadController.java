@@ -17,12 +17,15 @@ public class DownloadController {
     private YoutubeDownloadService youtubeDownloadService;
 
     @PostMapping("/stream")
-    public void streamVideo(@RequestBody Map<String, String> body, HttpServletResponse response)
-            throws IOException, InterruptedException {
+    public void streamVideo(
+            @RequestBody Map<String, String> body,
+            @RequestParam(defaultValue = "mp4") String format,
+            @RequestParam(defaultValue = "best") String quality,
+            HttpServletResponse response
+    ) throws IOException, InterruptedException {
 
         String url = body.get("url");
-        System.out.println("🎬 Download requested: " + url);
-
-        youtubeDownloadService.streamHighestQuality(url, response);
+        System.out.println("🎬 Request received: " + url);
+        youtubeDownloadService.handleVideoRequest(url, format, quality, response);
     }
 }

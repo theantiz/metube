@@ -44,28 +44,20 @@ When a user pastes a YouTube link and clicks **Download**:
 
 ---
 
-## Request Flow
+## ⚙️ Request Flow
 
-[ User Interface (React + Tailwind) ]
-           ↓
-[ Spring Boot Backend ]
-           ↓
-[ yt-dlp + ffmpeg ]
-           ↓
-[ Streams .mp4 back to user ]
+The user interacts with the React + Tailwind frontend, which sends a request to the Spring Boot backend.
+The backend then uses yt-dlp along with ffmpeg to process and download the requested video. 
+Once the video is ready, it streams the resulting .mp4 file back to the user for playback or download.
 
 ---
 
 🧾 Summary
 
 React + Tailwind CSS → Modern, responsive UI
-
 Spring Boot → Handles API requests and video streaming
-
 yt-dlp + ffmpeg → Fetch and merge YouTube content
-
 Instant streaming → Video sent directly to browser
-
 Temporary cleanup → No leftover files
 
 --- 
