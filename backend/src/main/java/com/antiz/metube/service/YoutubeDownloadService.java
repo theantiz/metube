@@ -40,7 +40,8 @@ public class YoutubeDownloadService {
             throws IOException, InterruptedException {
 
         String videoId = UUID.randomUUID().toString();
-        String outputFile = videoId + "." + format;
+        String outputFile = "/tmp/" + videoId + "." + format;
+
         String cmd;
 
         if (format.equals("mp3")) {
