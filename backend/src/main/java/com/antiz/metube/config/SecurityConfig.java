@@ -13,30 +13,45 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**").permitAll() // ✅ allow progress and download APIs
+                        .requestMatchers("/api/**").permitAll()  // allow all backend routes
                         .anyRequest().permitAll()
                 )
-                .headers(headers -> headers.frameOptions().disable());
+                .headers(headers -> headers.frameOptions().disable())
+                .cors(); // very important for deployed frontend access
 
         return http.build();
     }
+
+    // Disable default Spring Security user
     @Bean
     public UserDetailsService userDetailsService() {
-        // Disable default in-memory user creation
         return username -> null;
     }
-    // ✅ Enable CORS globally for frontend dev server
+
+    // Global CORS for local + production frontend
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**")
-                        .allowedOrigins("http://localhost:5173", "http://127.0.0.1:5173") // adjust if needed
-                        .allowedMethods("GET", "POST", "OPTIONS")
+                        .allowedOrigins(
+                                "http://localhost:5173",
+                                "http://127.0.0.1:5173",
+                                "https://your-frontend.onrender.com"  // ⭐ Add this after deploy
+                        )
+                        .allowedMethods(
+                                "GET",
+                                "POST",
+                                "PUT",
+                                "DELETE",
+                                "OPTIONS"
+                        )
+                        .allowedHeaders("*")
                         .allowCredentials(true);
             }
         };
