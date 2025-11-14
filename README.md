@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # MeTube – Full Stack YouTube Video Downloader  
 
 A full-stack application built with **React + Tailwind CSS** and **Spring Boot** that allows users to **download and stream YouTube videos** in the highest available quality.  
@@ -85,7 +85,4 @@ Temporary cleanup → No leftover files
 ---
 ## Author
 
-Jay Chothiyawala 
-=======
-# metube
->>>>>>> 976cd966ab3a9b891afb69890af79d529b643b59
+Jay Chothiyawala
