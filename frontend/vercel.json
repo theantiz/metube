@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://metube-backend-fswb.onrender.com/api/:path*"
+    }
+  ]
+}
