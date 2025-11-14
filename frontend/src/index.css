@@ -135,6 +135,8 @@
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.25);
   }
 
+
+
   .control-input::placeholder {
     color: rgba(148, 163, 184, 0.5);
     letter-spacing: 0.02em;
@@ -187,15 +189,15 @@
     top: 50%;
     right: 0.6rem;
     transform: translateY(-50%);
-    padding: 0.55rem 1.1rem;
+    padding: 0.55rem 0.8rem;
     border-radius: 0.9rem;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.95), rgba(14, 165, 233, 0.75));
+    background: rgba(56, 189, 248, 0.95);
     color: #0b1729;
-    box-shadow: 0 10px 30px rgba(56, 189, 248, 0.35);
+    transition: opacity 0.2s ease;
   }
 
   .control-button:disabled {
@@ -365,7 +367,7 @@
 @keyframes pulse-dot {
   0% {
     transform: rotate(0deg);
-    opacity: 0.5;
+    opacity: 0.5; 
   }
   50% {
     opacity: 1;

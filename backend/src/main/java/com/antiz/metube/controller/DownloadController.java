@@ -25,7 +25,6 @@ public class DownloadController {
     ) throws IOException, InterruptedException {
 
         String url = body.get("url");
-        System.out.println("🎬 Request received: " + url);
         youtubeDownloadService.handleVideoRequest(url, format, quality, response);
     }
 }

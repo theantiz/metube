@@ -27,17 +27,12 @@ public class YoutubeDownloadService {
         String cachedPath = redisTemplate.opsForValue().get(cacheKey);
 
         if (cachedPath != null && Files.exists(Paths.get(cachedPath))) {
-            System.out.println("⚡ Serving from Redis cache: " + cachedPath);
             streamFromFile(cachedPath, format, response);
             return;
         }
 
-        System.out.println("⬇️ Downloading new file for " + url);
         String filePath = downloadAndSave(url, format, quality);
-
         redisTemplate.opsForValue().set(cacheKey, filePath, CACHE_TTL_HOURS, TimeUnit.HOURS);
-        System.out.println("✅ Cached: " + cacheKey);
-
         streamFromFile(filePath, format, response);
     }
 
@@ -49,16 +44,13 @@ public class YoutubeDownloadService {
         String cmd;
 
         if (format.equals("mp3")) {
-            // 🎧 Audio-only extraction
             cmd = String.format(
                     "%s --no-check-certificates --geo-bypass --extract-audio " +
                             "--audio-format mp3 --audio-quality 0 " +
                             "-o \"%s\" \"%s\"",
                     YT_DLP_PATH, outputFile, url
             );
-
         } else {
-            // 🎥 High-quality video (supports 4K, HDR, AV1, etc.)
             String qualityArg = getBestVideoFormat(quality);
             cmd = String.format(
                     "%s --no-check-certificates --geo-bypass --concurrent-fragments 5 " +
@@ -69,8 +61,6 @@ public class YoutubeDownloadService {
             );
         }
 
-        System.out.println("▶ Running: " + cmd);
-
         ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
         pb.redirectErrorStream(true);
         Process process = pb.start();
@@ -78,21 +68,19 @@ public class YoutubeDownloadService {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("yt-dlp ▶ " + line);
+                System.out.println("yt-dlp: " + line);
             }
         }
 
         int exitCode = process.waitFor();
-        if (exitCode != 0) throw new RuntimeException("❌ yt-dlp failed with code: " + exitCode);
+        if (exitCode != 0) throw new RuntimeException("yt-dlp failed with code: " + exitCode);
 
         Path path = Paths.get(outputFile);
-        if (!Files.exists(path)) throw new IOException("❌ File missing after download.");
+        if (!Files.exists(path)) throw new IOException("File missing after download.");
 
-        System.out.println("✅ Download complete: " + path.toAbsolutePath());
         return path.toAbsolutePath().toString();
     }
 
-    // 🎯 Smart quality selection
     private String getBestVideoFormat(String quality) {
         switch (quality.toLowerCase()) {
             case "144p": return "bestvideo[height<=144][ext=mp4]";
@@ -112,7 +100,6 @@ public class YoutubeDownloadService {
     private void streamFromFile(String filePath, String format, HttpServletResponse response) throws IOException {
         File file = new File(filePath);
         if (!file.exists()) {
-            System.out.println("❌ Cached file not found: " + filePath);
             throw new IOException("File not found: " + filePath);
         }
 
@@ -125,7 +112,5 @@ public class YoutubeDownloadService {
             Files.copy(file.toPath(), out);
             out.flush();
         }
-
-        System.out.println("✅ Streamed successfully: " + filePath);
     }
 }

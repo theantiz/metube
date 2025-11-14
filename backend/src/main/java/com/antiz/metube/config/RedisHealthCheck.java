@@ -19,9 +19,9 @@ public class RedisHealthCheck {
         try (RedisConnection connection = redisConnectionFactory.getConnection()) {
             String pong = connection.ping();
             if ("PONG".equalsIgnoreCase(pong)) {
-                log.info("✅ Connected to Upstash Redis successfully (PING: PONG)");
+                log.info(" Connected to Upstash Redis successfully (PING: PONG)");
             } else {
-                log.warn("⚠️ Unexpected Redis response: {}", pong);
+                log.warn("Unexpected Redis response: {}", pong);
             }
         } catch (Exception e) {
             log.error("❌ Failed to connect to Redis: {}", e.getMessage());

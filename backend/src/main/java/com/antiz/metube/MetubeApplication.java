@@ -14,7 +14,7 @@ public class MetubeApplication {
 
     @Bean
     CommandLineRunner checkRedis(RedisConnectionFactory factory) {
-        return args -> System.out.println("✅ Redis PING: " + factory.getConnection().ping());
+        return args -> System.out.println("Redis PING: " + factory.getConnection().ping());
     }
 
 	public static void main(String[] args) {
