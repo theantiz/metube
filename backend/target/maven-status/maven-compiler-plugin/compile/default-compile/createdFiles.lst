@@ -1,4 +1,8 @@
-com/antiz/metube/MetubeApplication.class
-com/antiz/metube/service/YoutubeDownloadService.class
+com/antiz/metube/service/VideoCacheService.class
 com/antiz/metube/controller/DownloadController.class
+com/antiz/metube/config/RedisConfig.class
+com/antiz/metube/service/RedisCacheService.class
 com/antiz/metube/config/SecurityConfig.class
+com/antiz/metube/MetubeApplication.class
+com/antiz/metube/config/RedisCacheConfig.class
+com/antiz/metube/service/YoutubeDownloadService.class
