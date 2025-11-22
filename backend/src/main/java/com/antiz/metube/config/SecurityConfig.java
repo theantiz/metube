@@ -17,6 +17,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/**").permitAll()
+                        
                         .anyRequest().permitAll()
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()));
