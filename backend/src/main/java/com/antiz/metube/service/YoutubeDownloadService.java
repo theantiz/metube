@@ -58,7 +58,6 @@ public class YoutubeDownloadService {
         String cookieArg = "--cookies-from-browser chrome";
         String jsRuntimeFix = "--extractor-args \"youtube:player_client=all\"";
 
-        // MP3 branch with custom bitrate
         if (format.equals("mp3")) {
             String bitrate = mapBitrate(requestedAudioQuality);
 
@@ -70,7 +69,6 @@ public class YoutubeDownloadService {
             );
         }
 
-        // MP4 branch (unchanged)
         return String.format(
                 "%s %s %s --no-check-certificates --geo-bypass " +
                         "-f \"%s+bestaudio/best\" --merge-output-format mp4 " +
@@ -80,7 +78,6 @@ public class YoutubeDownloadService {
         );
     }
 
-    // Converts "320k" → "320K" for yt-dlp
     private String mapBitrate(String q) {
         if (q == null) return "0";
         return switch (q.toLowerCase()) {
@@ -89,11 +86,12 @@ public class YoutubeDownloadService {
             case "192k" -> "192K";
             case "128k" -> "128K";
             case "64k"  -> "64K";
-            default -> "0"; // best possible
+            default -> "0";
         };
     }
 
     private String selectFormat(String quality, String format) {
+
         if (format.equals("mp3")) return "bestaudio";
 
         return switch (quality.toLowerCase()) {
@@ -104,7 +102,7 @@ public class YoutubeDownloadService {
             case "720p" -> "bestvideo[height<=720][ext=mp4]";
             case "1080p" -> "bestvideo[height<=1080][ext=mp4]";
             case "1440p" -> "bestvideo[height<=1440][ext=mp4]";
-            case "2160p", "4k" -> "bestvideo[height<=2160][ext=mp4]/bestvideo[height<=2160]";
+            case "2160p", "4k" -> "bestvideo[height<=2160][ext=mp4]";
             default -> "bestvideo";
         };
     }

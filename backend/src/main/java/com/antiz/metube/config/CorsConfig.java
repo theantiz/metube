@@ -21,7 +21,7 @@ public class CorsConfig {
                                 "https://metube-antiz.vercel.app",
                                 "https://metube-frontend.onrender.com"
                         )
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedMethods("GET", "POST", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(false)
                         .maxAge(3600);
