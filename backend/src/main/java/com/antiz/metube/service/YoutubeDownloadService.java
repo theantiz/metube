@@ -55,7 +55,8 @@ public class YoutubeDownloadService {
 
     private String buildCommand(String url, String format, String qualityArg, String requestedAudioQuality, String outputFile) {
 
-        String jsRuntimeFix = "--extractor-args \"youtube:player_client=all\"";
+        String jsRuntimeFix = "--extractor-args \"youtube:player_client=android\"";
+
 
         // audio-only (mp3)
         if (format.equals("mp3")) {
