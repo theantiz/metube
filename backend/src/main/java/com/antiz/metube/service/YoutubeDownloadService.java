@@ -55,26 +55,27 @@ public class YoutubeDownloadService {
 
     private String buildCommand(String url, String format, String qualityArg, String requestedAudioQuality, String outputFile) {
 
-        String cookieArg = "--cookies-from-browser chrome";
         String jsRuntimeFix = "--extractor-args \"youtube:player_client=all\"";
 
+        // audio-only (mp3)
         if (format.equals("mp3")) {
             String bitrate = mapBitrate(requestedAudioQuality);
 
             return String.format(
-                    "%s %s %s --no-check-certificates --geo-bypass " +
+                    "%s %s --no-check-certificates --geo-bypass " +
                             "--extract-audio --audio-format mp3 --audio-quality %s " +
                             "-o \"%s\" \"%s\"",
-                    YT_DLP_PATH, cookieArg, jsRuntimeFix, bitrate, outputFile, url
+                    YT_DLP_PATH, jsRuntimeFix, bitrate, outputFile, url
             );
         }
 
+        // video (mp4)
         return String.format(
-                "%s %s %s --no-check-certificates --geo-bypass " +
+                "%s %s --no-check-certificates --geo-bypass " +
                         "-f \"%s+bestaudio/best\" --merge-output-format mp4 " +
                         "--remux-video mp4 --ffmpeg-location %s " +
                         "-o \"%s\" \"%s\"",
-                YT_DLP_PATH, cookieArg, jsRuntimeFix, qualityArg, FFMPEG_PATH, outputFile, url
+                YT_DLP_PATH, jsRuntimeFix, qualityArg, FFMPEG_PATH, outputFile, url
         );
     }
 
@@ -135,6 +136,7 @@ public class YoutubeDownloadService {
         response.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
 
         response.setContentType(format.equals("mp3") ? "audio/mpeg" : "video/mp4");
+
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"" + file.getName() + "\"");
 
