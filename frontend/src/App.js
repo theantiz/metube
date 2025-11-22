@@ -3,8 +3,11 @@ import { motion } from "framer-motion";
 
 const audioBitrates = ["320k", "256k", "192k", "128k", "64k"];
 
-// Connected to Render backend
-const API_BASE = "https://metube-backend-fswb.onrender.com";
+// API base: local proxy in dev, full URL in production
+const API_BASE =
+  process.env.NODE_ENV === "production"
+    ? "https://metube-backend-fswb.onrender.com"
+    : "";
 
 export default function App() {
   const [url, setUrl] = useState("");
@@ -16,12 +19,11 @@ export default function App() {
   useEffect(() => {
     if (format === "mp3") {
       setQuality(audioBitrates[0]);
-    } else if (format === "mp4") {
+    } else {
       setQuality("best");
     }
   }, [format]);
 
-  // Clean pasted YouTube links
   const cleanYouTubeUrl = (text) => {
     if (!text) return "";
     const match = text.match(
@@ -99,8 +101,7 @@ export default function App() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        {/* Header */}
-        <header className="space-y-4 text-center sm:text-left">
+        <header className="text-center sm:text-left space-y-4">
           <span className="badge flex items-center gap-2 mx-auto sm:mx-0">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             Quick grab, zero fluff
@@ -113,17 +114,13 @@ export default function App() {
           <p className="text-slate-300 text-base sm:text-lg max-w-lg mx-auto sm:mx-0">
             Paste your link, choose the quality, and download.
           </p>
-
-
         </header>
 
-        {/* Download Box */}
         <motion.section
           className="glass-card p-6 sm:p-8 space-y-6 shadow-surface"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* URL */}
           <div className="space-y-3">
             <label className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
               YouTube Video Link
@@ -138,33 +135,17 @@ export default function App() {
                 disabled={loading}
                 className="control-input"
               />
-
               <button
                 type="button"
                 onClick={handlePaste}
                 disabled={loading}
                 className="control-button paste-button"
-                title="Paste"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                  className="w-4 h-4"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
+                Paste
               </button>
             </div>
           </div>
 
-          {/* Format & Quality */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">
@@ -209,7 +190,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Download Button */}
           <motion.button
             type="button"
             onClick={handleDownload}
@@ -220,9 +200,7 @@ export default function App() {
             {loading ? "Downloading..." : "Start Download"}
           </motion.button>
 
-          {msg && (
-            <p className="text-center text-slate-200 font-medium">{msg}</p>
-          )}
+          {msg && <p className="text-center text-slate-200">{msg}</p>}
         </motion.section>
 
         <footer className="text-center text-xs text-slate-400">
@@ -231,11 +209,11 @@ export default function App() {
             href="https://antiz.xyz"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-slate-100 hover:text-emerald-400 transition-colors"
+            className="font-semibold text-slate-100 hover:text-emerald-400"
           >
             antiz
-          </a>{" "}
-          - YouTube Video Downloader
+          </a>
+
         </footer>
       </motion.div>
     </div>

@@ -85,7 +85,7 @@ public class YoutubeDownloadService {
             case "256k" -> "256K";
             case "192k" -> "192K";
             case "128k" -> "128K";
-            case "64k"  -> "64K";
+            case "64k" -> "64K";
             default -> "0";
         };
     }
@@ -130,6 +130,9 @@ public class YoutubeDownloadService {
 
         File file = new File(filePath);
         if (!file.exists()) throw new IOException("File does not exist: " + filePath);
+
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
 
         response.setContentType(format.equals("mp3") ? "audio/mpeg" : "video/mp4");
         response.setHeader("Content-Disposition",
