@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+
+const audioBitrates = ["320k", "256k", "192k", "128k", "64k"];
 
 // Connected to Render backend
 const API_BASE = "https://metube-backend-fswb.onrender.com";
@@ -10,6 +12,14 @@ export default function App() {
   const [msg, setMsg] = useState("");
   const [format, setFormat] = useState("mp4");
   const [quality, setQuality] = useState("best");
+
+  useEffect(() => {
+    if (format === "mp3") {
+      setQuality(audioBitrates[0]);
+    } else if (format === "mp4") {
+      setQuality("best");
+    }
+  }, [format]);
 
   // Clean pasted YouTube links
   const cleanYouTubeUrl = (text) => {
@@ -181,11 +191,20 @@ export default function App() {
                 className="control-select"
                 disabled={loading}
               >
-                <option value="best">Best</option>
-                <option value="1080p">1080p</option>
-                <option value="720p">720p</option>
-                <option value="480p">480p</option>
-                <option value="360p">360p</option>
+                {format === "mp3"
+                  ? audioBitrates.map((bit) => (
+                      <option key={bit} value={bit}>
+                        {bit}
+                      </option>
+                    ))
+                  : <>
+                      <option value="best">Best</option>
+                      <option value="1080p">1080p</option>
+                      <option value="720p">720p</option>
+                      <option value="480p">480p</option>
+                      <option value="360p">360p</option>
+                    </>
+                }
               </select>
             </div>
           </div>
@@ -209,7 +228,7 @@ export default function App() {
         <footer className="text-center text-xs text-slate-400">
           Crafted by{" "}
           <a
-            href="https://antiz.vercel.app"
+            href="https://antiz.xyz"
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-slate-100 hover:text-emerald-400 transition-colors"

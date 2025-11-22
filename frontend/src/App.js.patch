@@ -1,0 +1,63 @@
+=======
+import React, { useState, useEffect } from "react";
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+  const [format, setFormat] = useState("mp4");
+  const [quality, setQuality] = useState("best");
+
+  // Clean pasted YouTube links
+  const cleanYouTubeUrl = (text) => {
+=======
+  const [format, setFormat] = useState("mp4");
+  const [quality, setQuality] = useState("best");
+
+  const audioBitrates = ["320k", "256k", "192k", "128k", "64k"];
+
+  useEffect(() => {
+    if (format === "mp3") {
+      setQuality(audioBitrates[0]);
+    } else if (format === "mp4") {
+      setQuality("best");
+    }
+  }, [format]);
+
+  // Clean pasted YouTube links
+  const cleanYouTubeUrl = (text) => {
+>>>>>>> REPLACE
+
+<<<<<<< SEARCH
+              <select
+                value={quality}
+                onChange={(e) => setQuality(e.target.value)}
+                className="control-select"
+                disabled={loading}
+              >
+                <option value="best">Best</option>
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+                <option value="360p">360p</option>
+              </select>
+=======
+              <select
+                value={quality}
+                onChange={(e) => setQuality(e.target.value)}
+                className="control-select"
+                disabled={loading}
+              >
+                {format === "mp3"
+                  ? audioBitrates.map((bit) => (
+                      <option key={bit} value={bit}>
+                        {bit}
+                      </option>
+                    ))
+                  : <>
+                      <option value="best">Best</option>
+                      <option value="1080p">1080p</option>
+                      <option value="720p">720p</option>
+                      <option value="480p">480p</option>
+                      <option value="360p">360p</option>
+                    </>
+                }
+              </select>

@@ -43,7 +43,7 @@ public class YoutubeDownloadService {
         String outputFile = "/tmp/" + videoId + "." + format;
 
         String qualityArg = selectFormat(quality, format);
-        String command = buildCommand(url, format, qualityArg, outputFile);
+        String command = buildCommand(url, format, qualityArg, quality, outputFile);
 
         runCommand(command);
 
@@ -53,20 +53,24 @@ public class YoutubeDownloadService {
         return path.toAbsolutePath().toString();
     }
 
-    private String buildCommand(String url, String format, String qualityArg, String outputFile) {
+    private String buildCommand(String url, String format, String qualityArg, String requestedAudioQuality, String outputFile) {
 
         String cookieArg = "--cookies-from-browser chrome";
         String jsRuntimeFix = "--extractor-args \"youtube:player_client=all\"";
 
+        // MP3 branch with custom bitrate
         if (format.equals("mp3")) {
+            String bitrate = mapBitrate(requestedAudioQuality);
+
             return String.format(
                     "%s %s %s --no-check-certificates --geo-bypass " +
-                            "--extract-audio --audio-format mp3 --audio-quality 0 " +
+                            "--extract-audio --audio-format mp3 --audio-quality %s " +
                             "-o \"%s\" \"%s\"",
-                    YT_DLP_PATH, cookieArg, jsRuntimeFix, outputFile, url
+                    YT_DLP_PATH, cookieArg, jsRuntimeFix, bitrate, outputFile, url
             );
         }
 
+        // MP4 branch (unchanged)
         return String.format(
                 "%s %s %s --no-check-certificates --geo-bypass " +
                         "-f \"%s+bestaudio/best\" --merge-output-format mp4 " +
@@ -76,8 +80,20 @@ public class YoutubeDownloadService {
         );
     }
 
-    private String selectFormat(String quality, String format) {
+    // Converts "320k" → "320K" for yt-dlp
+    private String mapBitrate(String q) {
+        if (q == null) return "0";
+        return switch (q.toLowerCase()) {
+            case "320k" -> "320K";
+            case "256k" -> "256K";
+            case "192k" -> "192K";
+            case "128k" -> "128K";
+            case "64k"  -> "64K";
+            default -> "0"; // best possible
+        };
+    }
 
+    private String selectFormat(String quality, String format) {
         if (format.equals("mp3")) return "bestaudio";
 
         return switch (quality.toLowerCase()) {
