@@ -35,6 +35,7 @@ public class SecurityConfig {
         config.addAllowedOriginPattern("http://localhost:*");
         config.addAllowedOriginPattern("https://*.vercel.app");
         config.addAllowedOriginPattern("https://*.onrender.com");
+        config.addAllowedOriginPattern("https://metube.antiz.xyz");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
 
