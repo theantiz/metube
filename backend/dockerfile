@@ -1,3 +1,22 @@
+# ---------- Stage 1: Build the Spring Boot JAR ----------
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
+
+WORKDIR /app
+
+# Copy pom.xml first for dependency caching
+COPY pom.xml .
+
+# Pre-fetch dependencies
+RUN mvn -q -e -B dependency:go-offline
+
+# Copy source code
+COPY src ./src
+
+# Build the project
+RUN mvn -q -e -B clean package -DskipTests
+
+
+# ---------- Stage 2: Runtime Image ----------
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -12,15 +31,17 @@ RUN apt-get update && apt-get install -y \
     bash \
     && apt-get clean
 
-# Install yt-dlp binary
+# Install yt-dlp
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp
 
 WORKDIR /app
 
-# Copy Spring Boot JAR
-COPY target/*.jar app.jar
+# Copy the built JAR from Maven builder stage
+COPY --from=builder /app/target/*.jar app.jar
 
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
+
