@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -17,8 +18,31 @@ public class YoutubeDownloadService {
     private static final String FFMPEG_PATH = "/usr/bin/ffmpeg";
     private static final long CACHE_TTL_HOURS = 6;
 
+    private static final Path COOKIES_PATH = Paths.get("/tmp/yt_cookies.txt");
+    private static final String COOKIE_ENV = "YTDLP_COOKIES_B64";
+
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    public YoutubeDownloadService() {
+        writeCookiesIfPresent();
+    }
+
+    private void writeCookiesIfPresent() {
+        try {
+            String b64 = System.getenv(COOKIE_ENV);
+            if (b64 == null || b64.isBlank()) return;
+
+            byte[] decoded = Base64.getDecoder().decode(b64);
+            Files.write(COOKIES_PATH, decoded, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            COOKIES_PATH.toFile().setReadable(true, true);
+
+            System.out.println("Loaded YouTube cookies into /tmp/yt_cookies.txt");
+
+        } catch (Exception e) {
+            System.err.println("Failed to load cookies: " + e.getMessage());
+        }
+    }
 
     public void handleVideoRequest(String url, String format, String quality, HttpServletResponse response)
             throws IOException, InterruptedException {
@@ -53,30 +77,32 @@ public class YoutubeDownloadService {
         return path.toAbsolutePath().toString();
     }
 
-    private String buildCommand(String url, String format, String qualityArg, String requestedAudioQuality, String outputFile) {
+    private String buildCommand(String url, String format, String qualityArg,
+                                String requestedAudioQuality, String outputFile) {
 
         String jsRuntimeFix = "--extractor-args \"youtube:player_client=android\"";
 
+        String cookiesArg = Files.exists(COOKIES_PATH)
+                ? "--cookies " + COOKIES_PATH
+                : "";
 
-        // audio-only (mp3)
         if (format.equals("mp3")) {
             String bitrate = mapBitrate(requestedAudioQuality);
-
             return String.format(
-                    "%s %s --no-check-certificates --geo-bypass " +
+                    "%s %s %s --no-check-certificates --geo-bypass " +
                             "--extract-audio --audio-format mp3 --audio-quality %s " +
                             "-o \"%s\" \"%s\"",
-                    YT_DLP_PATH, jsRuntimeFix, bitrate, outputFile, url
+                    YT_DLP_PATH, jsRuntimeFix, cookiesArg, bitrate, outputFile, url
             );
         }
 
-        // video (mp4)
         return String.format(
-                "%s %s --no-check-certificates --geo-bypass " +
+                "%s %s %s --no-check-certificates --geo-bypass " +
                         "-f \"%s+bestaudio/best\" --merge-output-format mp4 " +
                         "--remux-video mp4 --ffmpeg-location %s " +
                         "-o \"%s\" \"%s\"",
-                YT_DLP_PATH, jsRuntimeFix, qualityArg, FFMPEG_PATH, outputFile, url
+                YT_DLP_PATH, jsRuntimeFix, cookiesArg,
+                qualityArg, FFMPEG_PATH, outputFile, url
         );
     }
 
@@ -112,8 +138,18 @@ public class YoutubeDownloadService {
     private void runCommand(String command) throws IOException, InterruptedException {
 
         ProcessBuilder pb = new ProcessBuilder("bash", "-c", command);
-        pb.redirectErrorStream(true);
+        pb.redirectErrorStream(false);
         Process process = pb.start();
+
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+
+        Thread errThread = new Thread(() -> {
+            try (InputStream es = process.getErrorStream()) {
+                es.transferTo(stderr);
+            } catch (IOException ignored) {}
+        });
+
+        errThread.start();
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream()))) {
@@ -124,18 +160,23 @@ public class YoutubeDownloadService {
             }
         }
 
-        if (process.waitFor() != 0) throw new RuntimeException("yt-dlp failed");
+        int exit = process.waitFor();
+        errThread.join();
+
+        if (exit != 0) {
+            String err = stderr.toString();
+            throw new RuntimeException("yt-dlp failed: " + err);
+        }
     }
 
     private void streamFromFile(String filePath, String format, HttpServletResponse response)
             throws IOException {
 
         File file = new File(filePath);
-        if (!file.exists()) throw new IOException("File does not exist: " + filePath);
+        if (!file.exists()) throw new IOException("Missing file: " + filePath);
 
         response.setHeader("Access-Control-Allow-Origin", "*");
         response.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
-
         response.setContentType(format.equals("mp3") ? "audio/mpeg" : "video/mp4");
 
         response.setHeader("Content-Disposition",
