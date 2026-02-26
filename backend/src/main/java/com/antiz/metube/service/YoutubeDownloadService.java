@@ -96,6 +96,10 @@ public class YoutubeDownloadService {
                 break;
             } catch (RuntimeException ex) {
                 lastError = ex.getMessage();
+                // Some failures won't be fixed by trying another player client.
+                if (isUnrecoverableFailure(lastError)) {
+                    break;
+                }
             }
         }
 
@@ -276,6 +280,19 @@ public class YoutubeDownloadService {
     private RuntimeException classifyFailure(String msg) {
         String lower = msg.toLowerCase(Locale.ROOT);
 
+        if (lower.contains("sign in to confirm you’re not a bot")
+                || lower.contains("sign in to confirm you're not a bot")
+                || lower.contains("--cookies-from-browser")
+                || lower.contains("use --cookies")) {
+            String hint = envOrBlank(COOKIE_ENV).isBlank()
+                    ? " Set YTDLP_COOKIES_B64 with exported YouTube cookies."
+                    : " Verify YTDLP_COOKIES_B64 contains fresh, valid YouTube cookies.";
+            if (envOrBlank(PROXY_ENV).isBlank()) {
+                hint += " You may also need a residential proxy via YTDLP_PROXY.";
+            }
+            return new DownloadException("YouTube bot verification blocked this request." + hint, 422);
+        }
+
         if (lower.contains("not made this video available in your country")
                 || lower.contains("this video is available in")) {
             String proxyHint = envOrBlank(PROXY_ENV).isBlank()
@@ -312,6 +329,16 @@ public class YoutubeDownloadService {
         }
 
         return new DownloadException("Download failed. Please try a different video or quality.", 502);
+    }
+
+    private boolean isUnrecoverableFailure(String msg) {
+        String lower = msg == null ? "" : msg.toLowerCase(Locale.ROOT);
+        return lower.contains("sign in to confirm you’re not a bot")
+                || lower.contains("sign in to confirm you're not a bot")
+                || lower.contains("use --cookies")
+                || lower.contains("private video")
+                || lower.contains("unsupported url")
+                || lower.contains("not made this video available in your country");
     }
 
     private String normalizeFormat(String format) {
