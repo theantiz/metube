@@ -2,7 +2,9 @@
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/config/RedisCacheConfig.java
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/config/RedisConfig.java
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/config/SecurityConfig.java
+/Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/controller/ApiExceptionHandler.java
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/controller/DownloadController.java
+/Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/service/DownloadException.java
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/service/RedisCacheService.java
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/service/VideoCacheService.java
 /Users/antiz/Developer/java/metube/backend/src/main/java/com/antiz/metube/service/YoutubeDownloadService.java

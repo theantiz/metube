@@ -25,6 +25,9 @@ public class YoutubeDownloadService {
 
     private static final Path COOKIES_PATH = Paths.get("/tmp/yt_cookies.txt");
     private static final String COOKIE_ENV = "YTDLP_COOKIES_B64";
+    private static final String PROXY_ENV = "YTDLP_PROXY";
+    private static final String GEO_COUNTRY_ENV = "YTDLP_GEO_BYPASS_COUNTRY";
+    private static final String FORCE_IPV4_ENV = "YTDLP_FORCE_IPV4";
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -51,6 +54,9 @@ public class YoutubeDownloadService {
 
     public void handleVideoRequest(String url, String format, String quality, HttpServletResponse response)
             throws IOException, InterruptedException {
+        if (url == null || url.isBlank()) {
+            throw new DownloadException("Missing YouTube URL", 400);
+        }
 
         String normalizedFormat = normalizeFormat(format);
         String normalizedQuality = normalizeQuality(quality);
@@ -74,8 +80,22 @@ public class YoutubeDownloadService {
         String outputFile = "/tmp/" + videoId + "." + format;
 
         String qualityArg = selectFormat(quality, format);
-        List<String> command = buildCommand(url, format, qualityArg, quality, outputFile);
-        runCommand(command);
+        List<List<String>> commands = buildCommandVariants(url, format, qualityArg, quality, outputFile);
+
+        String lastError = null;
+        for (List<String> command : commands) {
+            try {
+                runCommand(command);
+                lastError = null;
+                break;
+            } catch (RuntimeException ex) {
+                lastError = ex.getMessage();
+            }
+        }
+
+        if (lastError != null) {
+            throw classifyFailure(lastError);
+        }
 
         Path path = Paths.get(outputFile);
         if (!Files.exists(path)) throw new IOException("File not created by yt-dlp");
@@ -83,14 +103,40 @@ public class YoutubeDownloadService {
         return path.toAbsolutePath().toString();
     }
 
+    private List<List<String>> buildCommandVariants(String url, String format, String qualityArg,
+                                                    String requestedAudioQuality, String outputFile) {
+        return List.of(
+                buildCommand(url, format, qualityArg, requestedAudioQuality, outputFile, "android"),
+                buildCommand(url, format, qualityArg, requestedAudioQuality, outputFile, "web")
+        );
+    }
+
     private List<String> buildCommand(String url, String format, String qualityArg,
-                                      String requestedAudioQuality, String outputFile) {
+                                      String requestedAudioQuality, String outputFile, String playerClient) {
         List<String> args = new ArrayList<>();
         args.add(resolveYtDlpPath());
         args.add("--extractor-args");
-        args.add("youtube:player_client=android");
+        args.add("youtube:player_client=" + playerClient);
         args.add("--no-check-certificates");
         args.add("--geo-bypass");
+        args.add("--no-playlist");
+        args.add("--no-warnings");
+
+        String geoBypassCountry = envOrBlank(GEO_COUNTRY_ENV);
+        if (!geoBypassCountry.isBlank()) {
+            args.add("--geo-bypass-country");
+            args.add(geoBypassCountry);
+        }
+
+        String proxy = envOrBlank(PROXY_ENV);
+        if (!proxy.isBlank()) {
+            args.add("--proxy");
+            args.add(proxy);
+        }
+
+        if (Boolean.parseBoolean(envOrBlank(FORCE_IPV4_ENV))) {
+            args.add("-4");
+        }
 
         if (Files.exists(COOKIES_PATH)) {
             args.add("--cookies");
@@ -141,14 +187,14 @@ public class YoutubeDownloadService {
         if (format.equals("mp3")) return "bestaudio";
 
         return switch (quality.toLowerCase(Locale.ROOT)) {
-            case "144p" -> "bestvideo[height<=144][ext=mp4]";
-            case "240p" -> "bestvideo[height<=240][ext=mp4]";
-            case "360p" -> "bestvideo[height<=360][ext=mp4]";
-            case "480p" -> "bestvideo[height<=480][ext=mp4]";
-            case "720p" -> "bestvideo[height<=720][ext=mp4]";
-            case "1080p" -> "bestvideo[height<=1080][ext=mp4]";
-            case "1440p" -> "bestvideo[height<=1440][ext=mp4]";
-            case "2160p", "4k" -> "bestvideo[height<=2160][ext=mp4]";
+            case "144p" -> "bestvideo[height<=144]";
+            case "240p" -> "bestvideo[height<=240]";
+            case "360p" -> "bestvideo[height<=360]";
+            case "480p" -> "bestvideo[height<=480]";
+            case "720p" -> "bestvideo[height<=720]";
+            case "1080p" -> "bestvideo[height<=1080]";
+            case "1440p" -> "bestvideo[height<=1440]";
+            case "2160p", "4k" -> "bestvideo[height<=2160]";
             default -> "bestvideo";
         };
     }
@@ -184,6 +230,28 @@ public class YoutubeDownloadService {
             String err = stderr.toString();
             throw new RuntimeException("yt-dlp failed (exit " + exit + "): " + err);
         }
+    }
+
+    private RuntimeException classifyFailure(String msg) {
+        String lower = msg.toLowerCase(Locale.ROOT);
+
+        if (lower.contains("not made this video available in your country")
+                || lower.contains("this video is available in")) {
+            String proxyHint = envOrBlank(PROXY_ENV).isBlank()
+                    ? " Set YTDLP_PROXY to a proxy in an allowed country."
+                    : "";
+            return new DownloadException("Video is geo-restricted for server region." + proxyHint, 422);
+        }
+
+        if (lower.contains("private video") || lower.contains("sign in to confirm your age")) {
+            return new DownloadException("This video requires authentication/cookies to download.", 422);
+        }
+
+        if (lower.contains("unsupported url")) {
+            return new DownloadException("Unsupported or invalid YouTube URL.", 400);
+        }
+
+        return new DownloadException("Download failed. Please try a different video or quality.", 502);
     }
 
     private String normalizeFormat(String format) {
@@ -244,6 +312,11 @@ public class YoutubeDownloadService {
         }
 
         return fallback;
+    }
+
+    private String envOrBlank(String name) {
+        String value = System.getenv(name);
+        return value == null ? "" : value.trim();
     }
 
     private void streamFromFile(String filePath, String format, HttpServletResponse response)
