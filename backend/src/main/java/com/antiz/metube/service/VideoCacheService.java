@@ -1,10 +1,12 @@
 package com.antiz.metube.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@ConditionalOnProperty(name = "app.redis.enabled", havingValue = "true")
 public class VideoCacheService {
 
     private final RedisTemplate<String, Object> redisTemplate;

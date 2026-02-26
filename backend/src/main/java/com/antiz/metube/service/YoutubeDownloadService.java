@@ -3,6 +3,7 @@ package com.antiz.metube.service;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -29,8 +30,11 @@ public class YoutubeDownloadService {
     private static final String GEO_COUNTRY_ENV = "YTDLP_GEO_BYPASS_COUNTRY";
     private static final String FORCE_IPV4_ENV = "YTDLP_FORCE_IPV4";
 
-    @Autowired
+    @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
+
+    @Value("${app.redis.enabled:false}")
+    private boolean redisEnabled;
 
     public YoutubeDownloadService() {
         writeCookiesIfPresent();
@@ -199,10 +203,22 @@ public class YoutubeDownloadService {
         };
     }
 
-    private void runCommand(List<String> command) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.redirectErrorStream(false);
-        Process process = pb.start();
+    private void runCommand(List<String> command) throws InterruptedException {
+        Process process;
+        try {
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectErrorStream(false);
+            process = pb.start();
+        } catch (IOException e) {
+            String message = e.getMessage() == null ? "" : e.getMessage();
+            if (message.contains("Cannot run program")) {
+                throw new DownloadException(
+                        "yt-dlp is not installed on server. Install yt-dlp or set YT_DLP_PATH.",
+                        500
+                );
+            }
+            throw new DownloadException("Failed to start yt-dlp process.", 500);
+        }
 
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
 
@@ -221,6 +237,8 @@ public class YoutubeDownloadService {
             while ((line = reader.readLine()) != null) {
                 System.out.println("yt-dlp: " + line);
             }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
         int exit = process.waitFor();
@@ -247,8 +265,27 @@ public class YoutubeDownloadService {
             return new DownloadException("This video requires authentication/cookies to download.", 422);
         }
 
+        if (lower.contains("requested format is not available")) {
+            return new DownloadException("Requested quality/format is unavailable for this video. Try Best or lower quality.", 422);
+        }
+
+        if (lower.contains("video unavailable")
+                || lower.contains("this video is unavailable")
+                || lower.contains("copyright")
+                || lower.contains("removed by the uploader")) {
+            return new DownloadException("This video is unavailable for download.", 422);
+        }
+
         if (lower.contains("unsupported url")) {
             return new DownloadException("Unsupported or invalid YouTube URL.", 400);
+        }
+
+        if (lower.contains("timed out")
+                || lower.contains("temporary failure in name resolution")
+                || lower.contains("unable to download webpage")
+                || lower.contains("http error 5")
+                || lower.contains("too many requests")) {
+            return new DownloadException("YouTube is temporarily unreachable from server. Please retry in a minute.", 502);
         }
 
         return new DownloadException("Download failed. Please try a different video or quality.", 502);
@@ -266,6 +303,9 @@ public class YoutubeDownloadService {
     }
 
     private String getCachedPath(String cacheKey) {
+        if (!redisEnabled || redisTemplate == null) {
+            return null;
+        }
         try {
             return redisTemplate.opsForValue().get(cacheKey);
         } catch (Exception e) {
@@ -275,6 +315,9 @@ public class YoutubeDownloadService {
     }
 
     private void putCachedPath(String cacheKey, String filePath) {
+        if (!redisEnabled || redisTemplate == null) {
+            return;
+        }
         try {
             redisTemplate.opsForValue().set(cacheKey, filePath, CACHE_TTL_HOURS, TimeUnit.HOURS);
         } catch (Exception e) {

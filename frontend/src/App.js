@@ -1,30 +1,139 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
 const audioBitrates = ["320k", "256k", "192k", "128k", "64k"];
 const videoQualities = ["best", "1080p", "720p", "480p", "360p"];
 
-const API_BASE = "https://metube-backend-fswb.onrender.com";
+const API_BASE =
+  typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:8080"
+    : "https://metube-backend-fswb.onrender.com";
 
-const featureCards = [
-  {
-    title: "Always Free",
-    copy: "No payment gates. Just paste, choose quality, and download instantly.",
-  },
-  {
-    title: "High Quality",
-    copy: "MP4 and MP3 outputs with quality presets and fast conversion flow.",
-  },
-  {
-    title: "Clean UX",
-    copy: "Mobile-ready layout with focused actions and zero noisy UI.",
-  },
-  {
-    title: "Reliable Backend",
-    copy: "Spring + yt-dlp pipeline with cache support and resilient execution.",
-  },
-];
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: (delay = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: "easeOut", delay },
+  }),
+};
 
-export default function App() {
+function NavLink({ to, className, children }) {
+  const handleClick = (e) => {
+    e.preventDefault();
+    window.history.pushState({}, "", to);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+
+  return (
+    <a href={to} className={className} onClick={handleClick}>
+      {children}
+    </a>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="text-xs sm:text-sm text-slate-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <p>© {new Date().getFullYear()} MeTube. Ad-free.</p>
+      <div className="flex items-center gap-4">
+        <NavLink to="/privacy" className="footer-link">Privacy</NavLink>
+        <NavLink to="/terms" className="footer-link">Terms</NavLink>
+        <NavLink to="/feedback" className="footer-link">Feedback</NavLink>
+      </div>
+    </footer>
+  );
+}
+
+function LegalPage({ title, children }) {
+  return (
+    <div className="min-h-screen bg-page px-5 py-8 sm:px-8 sm:py-10 flex items-center justify-center">
+      <main className="relative z-10 w-full max-w-3xl mx-auto space-y-6">
+        <motion.nav
+          className="flex items-center justify-between"
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+        >
+          <NavLink to="/" className="text-white font-heading text-xl sm:text-2xl">MeTube</NavLink>
+          <span className="nav-chip">Ad-free</span>
+        </motion.nav>
+
+        <motion.section
+          className="glass-card p-6 sm:p-7 space-y-4 shadow-surface"
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          custom={0.05}
+        >
+          <h1 className="text-2xl sm:text-3xl font-heading text-white">{title}</h1>
+          <p className="text-xs text-slate-400">Last updated: February 26, 2026</p>
+          <div className="text-sm text-slate-200 leading-7 space-y-3">{children}</div>
+        </motion.section>
+
+        <Footer />
+      </main>
+    </div>
+  );
+}
+
+function PrivacyPage() {
+  return (
+    <LegalPage title="Privacy Policy">
+      <p>MeTube only processes the URL you submit to fetch downloadable media. We do not require account signup.</p>
+      <p>We may temporarily log technical metadata for reliability, abuse prevention, and debugging.</p>
+      <p>Downloaded files are generated on-demand and may be cached briefly for performance.</p>
+      <p>Do not submit private, illegal, or unauthorized content. You are responsible for your usage and local laws.</p>
+      <p>For privacy requests, contact us via the Feedback page.</p>
+    </LegalPage>
+  );
+}
+
+function TermsPage() {
+  return (
+    <LegalPage title="Terms of Use">
+      <p>By using MeTube, you agree to use the service lawfully and respect platform and copyright rules.</p>
+      <p>You may not abuse, overload, reverse engineer, or use the service for prohibited activity.</p>
+      <p>Service availability is not guaranteed. Features can change at any time without notice.</p>
+      <p>MeTube is provided as-is without warranties. You are responsible for the content you download.</p>
+      <p>If you do not agree with these terms, do not use the service.</p>
+    </LegalPage>
+  );
+}
+
+function FeedbackPage() {
+  const [feedback, setFeedback] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!feedback.trim()) return;
+    const subject = encodeURIComponent("MeTube Feedback");
+    const body = encodeURIComponent(feedback.trim());
+    window.location.href = `mailto:hello@metube.app?subject=${subject}&body=${body}`;
+    setSent(true);
+  };
+
+  return (
+    <LegalPage title="Feedback">
+      <p>We read all feedback. Share bugs, improvements, or feature requests.</p>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <textarea
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder="Write your feedback..."
+          className="control-input min-h-[130px] resize-y"
+        />
+        <button type="submit" className="primary-button" disabled={!feedback.trim()}>
+          Send Feedback
+        </button>
+      </form>
+      {sent && <p className="status-text">Your mail app should open now. Thank you.</p>}
+    </LegalPage>
+  );
+}
+
+function HomePage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -32,24 +141,8 @@ export default function App() {
   const [quality, setQuality] = useState("best");
 
   useEffect(() => {
-    if (format === "mp3") {
-      setQuality(audioBitrates[0]);
-    } else {
-      setQuality("best");
-    }
+    setQuality(format === "mp3" ? audioBitrates[0] : "best");
   }, [format]);
-
-  useEffect(() => {
-    const onMove = (e) => {
-      const x = (e.clientX / window.innerWidth) * 100;
-      const y = (e.clientY / window.innerHeight) * 100;
-      document.documentElement.style.setProperty("--mx", `${x}%`);
-      document.documentElement.style.setProperty("--my", `${y}%`);
-    };
-
-    window.addEventListener("pointermove", onMove);
-    return () => window.removeEventListener("pointermove", onMove);
-  }, []);
 
   const cleanYouTubeUrl = (text) => {
     if (!text) return "";
@@ -66,7 +159,6 @@ export default function App() {
 
   const handleDownload = async (e) => {
     e.preventDefault();
-
     if (!url.trim()) {
       setMsg("Please enter a valid YouTube URL.");
       return;
@@ -86,19 +178,24 @@ export default function App() {
       );
 
       if (!response.ok) {
-        setMsg("Download failed. Please retry.");
+        let errorMessage = "Download failed. Please retry.";
+        try {
+          const body = await response.json();
+          if (body?.error) errorMessage = body.error;
+        } catch (_e) {
+          // ignore non-JSON responses
+        }
+        setMsg(errorMessage);
         setLoading(false);
         return;
       }
 
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = blobUrl;
       a.download = format === "mp3" ? "audio.mp3" : "video.mp4";
       a.click();
-
       window.URL.revokeObjectURL(blobUrl);
       setMsg("Download complete.");
     } catch (err) {
@@ -114,147 +211,128 @@ export default function App() {
       const text = await navigator.clipboard.readText();
       setUrl(cleanYouTubeUrl(text));
       setMsg("");
-    } catch (err) {
+    } catch (_err) {
       setMsg("Clipboard access denied. Paste manually.");
     }
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden px-5 py-7 sm:px-8 sm:py-10 bg-page">
-      <div className="spotlight-layer" />
-      <span className="orb orb-one" />
-      <span className="orb orb-two" />
-      <span className="orb orb-three" />
-
-      <main className="relative z-10 w-full max-w-6xl mx-auto space-y-10 sm:space-y-14">
-        <nav className="flex items-center justify-between">
-          <div className="text-white font-heading text-xl sm:text-2xl">MeTube</div>
+    <div className="min-h-screen bg-page px-5 py-8 sm:px-8 sm:py-10 flex items-center justify-center">
+      <main className="relative z-10 w-full max-w-4xl mx-auto space-y-8">
+        <motion.nav
+          className="flex items-center justify-between"
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+        >
+          <h1 className="text-white font-heading text-xl sm:text-2xl">MeTube</h1>
           <span className="nav-chip">Free to use</span>
-        </nav>
+        </motion.nav>
 
-        <section className="grid lg:grid-cols-[1.2fr_1fr] gap-7 lg:gap-8 items-start">
-          <div className="space-y-5">
-            <span className="badge inline-flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Polished frontend experience
-            </span>
+        <motion.header
+          className="text-center space-y-3"
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          custom={0.04}
+        >
+          <h2 className="hero-heading">Download YouTube video or audio quickly.</h2>
+          <p className="text-slate-300 text-base max-w-2xl mx-auto">
+            Clean interface. No ads. No signup.
+          </p>
+        </motion.header>
 
-            <h1 className="hero-heading">
-              Download YouTube videos with a clean, modern interface.
-            </h1>
-
-            <p className="text-slate-300 text-base sm:text-lg max-w-xl leading-relaxed">
-              Built for speed, clarity, and visual impact. Free access, no
-              plan lock, and a UI crafted to feel production-grade.
-            </p>
-
-            <div className="flex flex-wrap gap-2.5">
-              <span className="pill">No Paywall</span>
-              <span className="pill">Fast Downloads</span>
-              <span className="pill">Mobile Ready</span>
-              <span className="pill">Hiring-grade UI</span>
+        <motion.section
+          className="glass-card p-5 sm:p-6 space-y-5 shadow-surface"
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          custom={0.08}
+        >
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.24em] text-slate-400 font-semibold">YouTube URL</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(cleanYouTubeUrl(e.target.value))}
+                placeholder="https://youtube.com/watch?v=..."
+                disabled={loading}
+                className="control-input"
+              />
+              <button
+                type="button"
+                onClick={handlePaste}
+                disabled={loading}
+                className="control-button paste-button"
+              >
+                Paste
+              </button>
             </div>
           </div>
 
-          <section className="glass-card shadow-surface p-6 sm:p-7 space-y-5">
-            <div className="space-y-2.5">
-              <label className="text-xs uppercase tracking-[0.28em] text-slate-400 font-semibold">
-                YouTube URL
-              </label>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(cleanYouTubeUrl(e.target.value))}
-                  placeholder="https://youtube.com/watch?v=..."
-                  disabled={loading}
-                  className="control-input"
-                />
-                <button
-                  type="button"
-                  onClick={handlePaste}
-                  disabled={loading}
-                  className="control-button paste-button"
-                >
-                  Paste
-                </button>
-              </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs uppercase tracking-[0.24em] text-slate-400 font-semibold">Format</label>
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+                className="control-select"
+                disabled={loading}
+              >
+                <option value="mp4">MP4 Video</option>
+                <option value="mp3">MP3 Audio</option>
+              </select>
             </div>
-
-            <div className="grid grid-cols-2 gap-3.5">
-              <div>
-                <label className="text-xs uppercase tracking-[0.28em] text-slate-400 font-semibold">
-                  Format
-                </label>
-                <select
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                  className="control-select"
-                  disabled={loading}
-                >
-                  <option value="mp4">MP4 Video</option>
-                  <option value="mp3">MP3 Audio</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs uppercase tracking-[0.28em] text-slate-400 font-semibold">
-                  Quality
-                </label>
-                <select
-                  value={quality}
-                  onChange={(e) => setQuality(e.target.value)}
-                  className="control-select"
-                  disabled={loading}
-                >
-                  {qualityOptions.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.24em] text-slate-400 font-semibold">Quality</label>
+              <select
+                value={quality}
+                onChange={(e) => setQuality(e.target.value)}
+                className="control-select"
+                disabled={loading}
+              >
+                {qualityOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={loading || !url.trim()}
-              className="primary-button"
-            >
-              {loading ? "Downloading..." : "Download Now"}
-            </button>
-
-            {msg && <p className="status-text">{msg}</p>}
-          </section>
-        </section>
-
-        <section className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {featureCards.map((item) => (
-            <article
-              key={item.title}
-              className="glass-card p-5"
-            >
-              <h2 className="text-lg font-semibold text-white">{item.title}</h2>
-              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-                {item.copy}
-              </p>
-            </article>
-          ))}
-        </section>
-
-        <footer className="text-xs sm:text-sm text-slate-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
-          <p>© {new Date().getFullYear()} MeTube. Free forever.</p>
-          <div className="flex items-center gap-4">
-            <a href="/privacy" className="hover:text-slate-100">Privacy</a>
-            <a href="/terms" className="hover:text-slate-100">Terms</a>
-            <a href="mailto:hello@metube.app" className="hover:text-slate-100">
-              Contact
-            </a>
           </div>
-        </footer>
+
+          <motion.button
+            type="button"
+            onClick={handleDownload}
+            disabled={loading || !url.trim()}
+            className="primary-button"
+            whileTap={{ scale: loading ? 1 : 0.985 }}
+          >
+            {loading ? "Downloading..." : "Download"}
+          </motion.button>
+
+          {msg && <p className="status-text">{msg}</p>}
+        </motion.section>
+
+        <Footer />
       </main>
     </div>
   );
+}
+
+export default function App() {
+  const [path, setPath] = useState(
+    typeof window !== "undefined" ? window.location.pathname : "/"
+  );
+
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname || "/");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  if (path === "/privacy") return <PrivacyPage />;
+  if (path === "/terms") return <TermsPage />;
+  if (path === "/feedback") return <FeedbackPage />;
+  return <HomePage />;
 }
