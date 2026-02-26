@@ -7,15 +7,20 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
 public class YoutubeDownloadService {
 
-    private static final String YT_DLP_PATH = "/usr/local/bin/yt-dlp";
-    private static final String FFMPEG_PATH = "/usr/bin/ffmpeg";
+    private static final String YT_DLP_ENV = "YT_DLP_PATH";
+    private static final String FFMPEG_ENV = "FFMPEG_PATH";
+    private static final String FALLBACK_YT_DLP = "yt-dlp";
+    private static final String FALLBACK_FFMPEG = "ffmpeg";
     private static final long CACHE_TTL_HOURS = 6;
 
     private static final Path COOKIES_PATH = Paths.get("/tmp/yt_cookies.txt");
@@ -47,17 +52,19 @@ public class YoutubeDownloadService {
     public void handleVideoRequest(String url, String format, String quality, HttpServletResponse response)
             throws IOException, InterruptedException {
 
-        String cacheKey = "video:" + url + ":" + format + ":" + quality;
-        String cachedPath = redisTemplate.opsForValue().get(cacheKey);
+        String normalizedFormat = normalizeFormat(format);
+        String normalizedQuality = normalizeQuality(quality);
+        String cacheKey = "video:" + url + ":" + normalizedFormat + ":" + normalizedQuality;
+        String cachedPath = getCachedPath(cacheKey);
 
         if (cachedPath != null && Files.exists(Paths.get(cachedPath))) {
-            streamFromFile(cachedPath, format, response);
+            streamFromFile(cachedPath, normalizedFormat, response);
             return;
         }
 
-        String filePath = downloadVideo(url, format, quality);
-        redisTemplate.opsForValue().set(cacheKey, filePath, CACHE_TTL_HOURS, TimeUnit.HOURS);
-        streamFromFile(filePath, format, response);
+        String filePath = downloadVideo(url, normalizedFormat, normalizedQuality);
+        putCachedPath(cacheKey, filePath);
+        streamFromFile(filePath, normalizedFormat, response);
     }
 
     private String downloadVideo(String url, String format, String quality)
@@ -67,8 +74,7 @@ public class YoutubeDownloadService {
         String outputFile = "/tmp/" + videoId + "." + format;
 
         String qualityArg = selectFormat(quality, format);
-        String command = buildCommand(url, format, qualityArg, quality, outputFile);
-
+        List<String> command = buildCommand(url, format, qualityArg, quality, outputFile);
         runCommand(command);
 
         Path path = Paths.get(outputFile);
@@ -77,33 +83,45 @@ public class YoutubeDownloadService {
         return path.toAbsolutePath().toString();
     }
 
-    private String buildCommand(String url, String format, String qualityArg,
-                                String requestedAudioQuality, String outputFile) {
+    private List<String> buildCommand(String url, String format, String qualityArg,
+                                      String requestedAudioQuality, String outputFile) {
+        List<String> args = new ArrayList<>();
+        args.add(resolveYtDlpPath());
+        args.add("--extractor-args");
+        args.add("youtube:player_client=android");
+        args.add("--no-check-certificates");
+        args.add("--geo-bypass");
 
-        String jsRuntimeFix = "--extractor-args \"youtube:player_client=android\"";
-
-        String cookiesArg = Files.exists(COOKIES_PATH)
-                ? "--cookies " + COOKIES_PATH
-                : "";
+        if (Files.exists(COOKIES_PATH)) {
+            args.add("--cookies");
+            args.add(COOKIES_PATH.toString());
+        }
 
         if (format.equals("mp3")) {
             String bitrate = mapBitrate(requestedAudioQuality);
-            return String.format(
-                    "%s %s %s --no-check-certificates --geo-bypass " +
-                            "--extract-audio --audio-format mp3 --audio-quality %s " +
-                            "-o \"%s\" \"%s\"",
-                    YT_DLP_PATH, jsRuntimeFix, cookiesArg, bitrate, outputFile, url
-            );
+            args.add("--extract-audio");
+            args.add("--audio-format");
+            args.add("mp3");
+            args.add("--audio-quality");
+            args.add(bitrate);
+            args.add("-o");
+            args.add(outputFile);
+            args.add(url);
+            return args;
         }
 
-        return String.format(
-                "%s %s %s --no-check-certificates --geo-bypass " +
-                        "-f \"%s+bestaudio/best\" --merge-output-format mp4 " +
-                        "--remux-video mp4 --ffmpeg-location %s " +
-                        "-o \"%s\" \"%s\"",
-                YT_DLP_PATH, jsRuntimeFix, cookiesArg,
-                qualityArg, FFMPEG_PATH, outputFile, url
-        );
+        args.add("-f");
+        args.add(qualityArg + "+bestaudio/best");
+        args.add("--merge-output-format");
+        args.add("mp4");
+        args.add("--remux-video");
+        args.add("mp4");
+        args.add("--ffmpeg-location");
+        args.add(resolveFfmpegPath());
+        args.add("-o");
+        args.add(outputFile);
+        args.add(url);
+        return args;
     }
 
     private String mapBitrate(String q) {
@@ -122,7 +140,7 @@ public class YoutubeDownloadService {
 
         if (format.equals("mp3")) return "bestaudio";
 
-        return switch (quality.toLowerCase()) {
+        return switch (quality.toLowerCase(Locale.ROOT)) {
             case "144p" -> "bestvideo[height<=144][ext=mp4]";
             case "240p" -> "bestvideo[height<=240][ext=mp4]";
             case "360p" -> "bestvideo[height<=360][ext=mp4]";
@@ -135,9 +153,8 @@ public class YoutubeDownloadService {
         };
     }
 
-    private void runCommand(String command) throws IOException, InterruptedException {
-
-        ProcessBuilder pb = new ProcessBuilder("bash", "-c", command);
+    private void runCommand(List<String> command) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(false);
         Process process = pb.start();
 
@@ -165,8 +182,68 @@ public class YoutubeDownloadService {
 
         if (exit != 0) {
             String err = stderr.toString();
-            throw new RuntimeException("yt-dlp failed: " + err);
+            throw new RuntimeException("yt-dlp failed (exit " + exit + "): " + err);
         }
+    }
+
+    private String normalizeFormat(String format) {
+        if (format == null) return "mp4";
+        String normalized = format.toLowerCase(Locale.ROOT);
+        return normalized.equals("mp3") ? "mp3" : "mp4";
+    }
+
+    private String normalizeQuality(String quality) {
+        if (quality == null || quality.isBlank()) return "best";
+        return quality;
+    }
+
+    private String getCachedPath(String cacheKey) {
+        try {
+            return redisTemplate.opsForValue().get(cacheKey);
+        } catch (Exception e) {
+            System.err.println("Redis read failed, continuing without cache: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void putCachedPath(String cacheKey, String filePath) {
+        try {
+            redisTemplate.opsForValue().set(cacheKey, filePath, CACHE_TTL_HOURS, TimeUnit.HOURS);
+        } catch (Exception e) {
+            System.err.println("Redis write failed, continuing without cache: " + e.getMessage());
+        }
+    }
+
+    private String resolveYtDlpPath() {
+        return resolveBinary(YT_DLP_ENV, List.of(
+                "/usr/local/bin/yt-dlp",
+                "/opt/homebrew/bin/yt-dlp",
+                "/usr/bin/yt-dlp"
+        ), FALLBACK_YT_DLP);
+    }
+
+    private String resolveFfmpegPath() {
+        return resolveBinary(FFMPEG_ENV, List.of(
+                "/usr/bin/ffmpeg",
+                "/usr/local/bin/ffmpeg",
+                "/opt/homebrew/bin/ffmpeg"
+        ), FALLBACK_FFMPEG);
+    }
+
+    private String resolveBinary(String envVar, List<String> candidates, String fallback) {
+        String configured = System.getenv(envVar);
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+
+        for (String candidate : candidates) {
+            Path path = Paths.get(candidate);
+            if (Files.isExecutable(path)) {
+                return candidate;
+            }
+        }
+
+        return fallback;
     }
 
     private void streamFromFile(String filePath, String format, HttpServletResponse response)
