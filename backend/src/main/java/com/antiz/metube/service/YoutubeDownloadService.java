@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -29,6 +30,7 @@ public class YoutubeDownloadService {
     private static final String PROXY_ENV = "YTDLP_PROXY";
     private static final String GEO_COUNTRY_ENV = "YTDLP_GEO_BYPASS_COUNTRY";
     private static final String FORCE_IPV4_ENV = "YTDLP_FORCE_IPV4";
+    private static final long YTDLP_TIMEOUT_SECONDS = 180;
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
@@ -125,6 +127,12 @@ public class YoutubeDownloadService {
         args.add("--geo-bypass");
         args.add("--no-playlist");
         args.add("--no-warnings");
+        args.add("--socket-timeout");
+        args.add("20");
+        args.add("--retries");
+        args.add("2");
+        args.add("--fragment-retries");
+        args.add("2");
 
         String geoBypassCountry = envOrBlank(GEO_COUNTRY_ENV);
         if (!geoBypassCountry.isBlank()) {
@@ -223,8 +231,13 @@ public class YoutubeDownloadService {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
 
         Thread errThread = new Thread(() -> {
-            try (InputStream es = process.getErrorStream()) {
-                es.transferTo(stderr);
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.err.println("yt-dlp err: " + line);
+                    stderr.write((line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+                }
             } catch (IOException ignored) {}
         });
 
@@ -241,7 +254,17 @@ public class YoutubeDownloadService {
             throw new RuntimeException(e);
         }
 
-        int exit = process.waitFor();
+        boolean finished = process.waitFor(YTDLP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            errThread.join();
+            throw new DownloadException(
+                    "yt-dlp timed out on server. Try another video, lower quality, or retry shortly.",
+                    504
+            );
+        }
+
+        int exit = process.exitValue();
         errThread.join();
 
         if (exit != 0) {
